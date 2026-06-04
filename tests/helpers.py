@@ -2,7 +2,7 @@
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from ac import *
+from src.ac import *
 import time 
 from sage.all import *
 import random
@@ -71,7 +71,7 @@ def verifier_checks_1(z, bound, A1, q1, poly_mod, N, w_bold, challenge, t11):
         return time.perf_counter(), True, 0  
     return time.perf_counter(), False, 2
 
-def or_property_size_info(p_size, v_size, prover_sizes, verifier_sizes, index,random_index, bit, message, m_prime, m_att, val, other_val, A1, A2, q1, q2, N, k_hat, t11, t21, B, disclose_indices ,r1, bound, setup_start, protocol_start, num_attributes,G):
+def or_property_info(p_size, v_size, prover_sizes, verifier_sizes, index,random_index, bit, message, m_prime, m_att, val, other_val, A1, A2, q1, q2, N, k_hat, t11, t21, B, disclose_indices ,r1, bound, setup_start, protocol_start, num_attributes,G):
 
     rejection_fail_count = 0
     rejection_abort = True
@@ -171,99 +171,99 @@ def or_property_size_info(p_size, v_size, prover_sizes, verifier_sizes, index,ra
             rt_with_setup = time_value - setup_start
             rt = time_value - protocol_start
 
-            return prover_sizes, verifier_sizes, status, rt,rt_with_setup, {"Index": index, "Time":rt, "Time (with Setup)":rt_with_setup , "Rej Count":rejection_fail_count ,"Number Attributes": num_attributes,"Attribute Value":val, "Not Attribute Value":other_val, "Attribute Index":disclose_indices, "Success":status, "Error": error,  "message": message, "m_prime_1":m_prime[0], "m_prime_2":m_prime[1], "m_att_1": m_att[0], "m_att_2": m_att[1]}
+            return prover_sizes, verifier_sizes, p_size,v_size, status, rt,rt_with_setup, {"Index": index, "Time":rt, "Time (with Setup)":rt_with_setup , "Rej Count":rejection_fail_count ,"Number Attributes": num_attributes,"Attribute Value":val, "Not Attribute Value":other_val, "Attribute Index":disclose_indices, "Success":status, "Error": error,  "message": message, "m_prime_1":m_prime[0], "m_prime_2":m_prime[1], "m_att_1": m_att[0], "m_att_2": m_att[1]}
 
 
-def or_property(index,random_index, bit, message, m_prime, m_att, val, other_val, A1, A2, q1, q2, N, k_hat, t11, t21, B, disclose_indices ,r1, bound, setup_start, protocol_start, num_attributes,G):
+# def or_property(index,random_index, bit, message, m_prime, m_att, val, other_val, A1, A2, q1, q2, N, k_hat, t11, t21, B, disclose_indices ,r1, bound, setup_start, protocol_start, num_attributes,G):
 
-    rejection_fail_count = 0
-    rejection_abort = True
-    while rejection_abort:
-        prover_gamma_prime = [random.randrange(0, q2) for i in range(k_hat)]
-        g= []
-        g_2 =[]
+#     rejection_fail_count = 0
+#     rejection_abort = True
+#     while rejection_abort:
+#         prover_gamma_prime = [random.randrange(0, q2) for i in range(k_hat)]
+#         g= []
+#         g_2 =[]
 
-        for i in range(k_hat):
-            f = gen_matrix_ring(1,1,q2,N)
-            f_2 = gen_matrix_ring(1,1,q2,N)
-            for j in disclose_indices:
-                if random_index == 1: #False value OR True other_value
-                    diff = val - other_val
-                    f[0][0][j] = -1*diff*prover_gamma_prime[i] 
-                    f_2[0][0][j] = 0
-                else:
-                    diff = val - other_val
-                    f[0][0][j] = 0
-                    f_2[0][0][j] = -1*diff*prover_gamma_prime[i] 
-            f = mod_3D(len(f),f, q2)
-            f_2 = mod_3D(len(f_2),f_2, q2)
+#         for i in range(k_hat):
+#             f = gen_matrix_ring(1,1,q2,N)
+#             f_2 = gen_matrix_ring(1,1,q2,N)
+#             for j in disclose_indices:
+#                 if random_index == 1: #False value OR True other_value
+#                     diff = val - other_val
+#                     f[0][0][j] = -1*diff*prover_gamma_prime[i] 
+#                     f_2[0][0][j] = 0
+#                 else:
+#                     diff = val - other_val
+#                     f[0][0][j] = 0
+#                     f_2[0][0][j] = -1*diff*prover_gamma_prime[i] 
+#             f = mod_3D(len(f),f, q2)
+#             f_2 = mod_3D(len(f_2),f_2, q2)
 
-            g.append(f[0])
-            g_2.append(f_2[0])
-        g = poly_matmul(g, np.array(G), q2, poly_mod,N)
-        g_2 = poly_matmul(g_2, np.array(G), q2, poly_mod,N)
+#             g.append(f[0])
+#             g_2.append(f_2[0])
+#         g = poly_matmul(g, np.array(G), q2, poly_mod,N)
+#         g_2 = poly_matmul(g_2, np.array(G), q2, poly_mod,N)
 
-        tmp = poly_matmul(B, r1,q2,poly_mod, N)
-        t_g_1 = poly_add_3D(tmp,np.array(g), q2, poly_mod, N)
-        t_g_2 =  poly_add_3D(tmp,np.array(g_2), q2, poly_mod, N)
+#         tmp = poly_matmul(B, r1,q2,poly_mod, N)
+#         t_g_1 = poly_add_3D(tmp,np.array(g), q2, poly_mod, N)
+#         t_g_2 =  poly_add_3D(tmp,np.array(g_2), q2, poly_mod, N)
 
-        gammas = [random.randrange(0, q2) for i in range(k_hat)]
-        gammas_double_prime = np.array(gammas) - np.array(prover_gamma_prime)
-        if random_index == 1:
-            gammas_all = [prover_gamma_prime,gammas_double_prime]
-        else:
-            gammas_all = [gammas_double_prime, prover_gamma_prime]
-        y_sampler = DiscreteGaussianDistributionLatticeSampler(ZZ**N, sigma=xi)
-        y = [[y_sampler(),y_sampler()] for j in range(k)]
-        w_bold = np.array(poly_matmul(A1, y, q1, poly_mod, N))
+#         gammas = [random.randrange(0, q2) for i in range(k_hat)]
+#         gammas_double_prime = np.array(gammas) - np.array(prover_gamma_prime)
+#         if random_index == 1:
+#             gammas_all = [prover_gamma_prime,gammas_double_prime]
+#         else:
+#             gammas_all = [gammas_double_prime, prover_gamma_prime]
+#         y_sampler = DiscreteGaussianDistributionLatticeSampler(ZZ**N, sigma=xi)
+#         y = [[y_sampler(),y_sampler()] for j in range(k)]
+#         w_bold = np.array(poly_matmul(A1, y, q1, poly_mod, N))
 
-        h_1= []
-        h_2 = []
-        w_1 = []
-        w_2 = []
+#         h_1= []
+#         h_2 = []
+#         w_1 = []
+#         w_2 = []
 
-        for i in range(k_hat):
-            h_i_1 = poly_add_3D([g[i]], np.multiply(gammas_all[0][i],m_prime[0]), q2, poly_mod, N)
-            h_i_2 = poly_add_3D([g_2[i]], np.multiply(gammas_all[1][i],m_prime[1]), q2, poly_mod, N)
+#         for i in range(k_hat):
+#             h_i_1 = poly_add_3D([g[i]], np.multiply(gammas_all[0][i],m_prime[0]), q2, poly_mod, N)
+#             h_i_2 = poly_add_3D([g_2[i]], np.multiply(gammas_all[1][i],m_prime[1]), q2, poly_mod, N)
 
-            w_i_1 = poly_matmul(poly_add_3D(np.multiply(gammas_all[0][i],A2),B[[i],:], q2, poly_mod, N), y, q2, poly_mod, N)
-            w_i_2 = poly_matmul(poly_add_3D(np.multiply(gammas_all[1][i],A2),B[[i],:], q2, poly_mod, N), y, q2, poly_mod, N)
+#             w_i_1 = poly_matmul(poly_add_3D(np.multiply(gammas_all[0][i],A2),B[[i],:], q2, poly_mod, N), y, q2, poly_mod, N)
+#             w_i_2 = poly_matmul(poly_add_3D(np.multiply(gammas_all[1][i],A2),B[[i],:], q2, poly_mod, N), y, q2, poly_mod, N)
 
-            h_1.append(h_i_1[0])
-            h_2.append(h_i_2[0])
-            w_1.append(w_i_1[0])
-            w_2.append(w_i_2[0])
+#             h_1.append(h_i_1[0])
+#             h_2.append(h_i_2[0])
+#             w_1.append(w_i_1[0])
+#             w_2.append(w_i_2[0])
 
-        challenge = generate_random(2,2,N,2)
-        z = np.array(poly_add_3D_no_mod(np.array(y),ring_transpose(poly_matmul_no_mod(np.array(challenge),ring_transpose(np.array(r1)), poly_mod, N)), poly_mod, N))
+#         challenge = generate_random(2,2,N,2)
+#         z = np.array(poly_add_3D_no_mod(np.array(y),ring_transpose(poly_matmul_no_mod(np.array(challenge),ring_transpose(np.array(r1)), poly_mod, N)), poly_mod, N))
         
-        if rejection_sampling_1(z, poly_matmul(np.array(challenge),ring_transpose(np.array(r1)),q2, poly_mod, N), xi) == 0:
-            rejection_fail_count = rejection_fail_count + 1
-        else:
-            rejection_abort = False
-            time_value, status, error = verifier_checks_1(z, bound, A1, q1, poly_mod, N, w_bold, challenge, t11)
+#         if rejection_sampling_1(z, poly_matmul(np.array(challenge),ring_transpose(np.array(r1)),q2, poly_mod, N), xi) == 0:
+#             rejection_fail_count = rejection_fail_count + 1
+#         else:
+#             rejection_abort = False
+#             time_value, status, error = verifier_checks_1(z, bound, A1, q1, poly_mod, N, w_bold, challenge, t11)
             
-            for i in range(k_hat):
-                if gammas[i] - prover_gamma_prime[i] != gammas_double_prime[i]:
-                    rt_with_setup = time.perf_counter() - setup_start
-                    rt = time.perf_counter() - protocol_start
-                    return False, rt, rt_with_setup,{"Index": index, "Time":rt, "Time (with Setup)":rt_with_setup , "Rej Count":rejection_fail_count ,"Number Attributes": num_attributes,"Attribute Value":val, "Not Attribute Value":other_val, "Attribute Index":disclose_indices[0], "Success":False, "Error": 3.1,  "message": message, "m_prime_1":m_prime[0], "m_prime_2":m_prime[1], "m_att_1": m_att[0], "m_att_2": m_att[1]}
+#             for i in range(k_hat):
+#                 if gammas[i] - prover_gamma_prime[i] != gammas_double_prime[i]:
+#                     rt_with_setup = time.perf_counter() - setup_start
+#                     rt = time.perf_counter() - protocol_start
+#                     return False, rt, rt_with_setup,{"Index": index, "Time":rt, "Time (with Setup)":rt_with_setup , "Rej Count":rejection_fail_count ,"Number Attributes": num_attributes,"Attribute Value":val, "Not Attribute Value":other_val, "Attribute Index":disclose_indices[0], "Success":False, "Error": 3.1,  "message": message, "m_prime_1":m_prime[0], "m_prime_2":m_prime[1], "m_att_1": m_att[0], "m_att_2": m_att[1]}
         
 
-            if status == True:
-                # we want to check that the coefficients are zero
-                time_value, status, error = verifier_checks_2(k_hat, disclose_indices, True, h_1)
-            if status == True:
-                time_value, status, error = verifier_checks_2(k_hat, disclose_indices, True, h_2)
-            if status == True:
-                time_value, status, error = verifier_checks_3(k_hat,gammas_all[0], A2, B, q2, poly_mod, N, z, challenge, t21, m_att[0], h_1,w_1, t_g_1)
-            if status == True:
-                time_value, status, error = verifier_checks_3(k_hat, gammas_all[1], A2, B, q2, poly_mod, N, z, challenge, t21, m_att[1], h_2,w_2, t_g_2)
+#             if status == True:
+#                 # we want to check that the coefficients are zero
+#                 time_value, status, error = verifier_checks_2(k_hat, disclose_indices, True, h_1)
+#             if status == True:
+#                 time_value, status, error = verifier_checks_2(k_hat, disclose_indices, True, h_2)
+#             if status == True:
+#                 time_value, status, error = verifier_checks_3(k_hat,gammas_all[0], A2, B, q2, poly_mod, N, z, challenge, t21, m_att[0], h_1,w_1, t_g_1)
+#             if status == True:
+#                 time_value, status, error = verifier_checks_3(k_hat, gammas_all[1], A2, B, q2, poly_mod, N, z, challenge, t21, m_att[1], h_2,w_2, t_g_2)
                       
-            rt_with_setup = time_value - setup_start
-            rt = time_value - protocol_start
+#             rt_with_setup = time_value - setup_start
+#             rt = time_value - protocol_start
 
-            return status, rt,rt_with_setup, {"Index": index, "Time":rt, "Time (with Setup)":rt_with_setup , "Rej Count":rejection_fail_count ,"Number Attributes": num_attributes,"Attribute Value":val, "Not Attribute Value":other_val, "Attribute Index":disclose_indices, "Success":status, "Error": error,  "message": message, "m_prime_1":m_prime[0], "m_prime_2":m_prime[1], "m_att_1": m_att[0], "m_att_2": m_att[1]}
+#             return status, rt,rt_with_setup, {"Index": index, "Time":rt, "Time (with Setup)":rt_with_setup , "Rej Count":rejection_fail_count ,"Number Attributes": num_attributes,"Attribute Value":val, "Not Attribute Value":other_val, "Attribute Index":disclose_indices, "Success":status, "Error": error,  "message": message, "m_prime_1":m_prime[0], "m_prime_2":m_prime[1], "m_att_1": m_att[0], "m_att_2": m_att[1]}
 
 def disclose(disclose_indices, m_prime,r1, bound, setup_start, protocol_start,  A1, q1, q2, num_attributes, vals,message, m_att,index,t11, t21, poly_mod,N,B,A, A2, k_hat):
     

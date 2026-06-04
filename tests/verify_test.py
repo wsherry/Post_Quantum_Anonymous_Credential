@@ -1,23 +1,12 @@
-
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from ac import *
-from latticezk import *
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src/')))
+from src.ac import *
+from latticezk_signature import *
 import time
-from extra_functions import write_file
-
-def R_to_S_vec(S,vec):
-    new_vec = sg.vector(S, len(vec))
-    for i in range(len(vec)):
-        coeffs = Rql_2_ZZl(vec)
-        # print(coeffs)
-        poly_q2 = S(sum(c * t**k for k, c in enumerate(coeffs)))
-        new_vec[i] = poly_q2
-    return new_vec       
+from tests.helpers import *
 
 
-def test_abdlop_mlwe__(F_comm, u, cred):
+
+def test_abdlop_mlwe__(F_comm, u, cred,start, bound):
     """Call abdlop_mlwe with example parameters"""
     # Size parameters
     deg = 512
@@ -32,8 +21,6 @@ def test_abdlop_mlwe__(F_comm, u, cred):
     lambd = 5  # number of random masking polynomials (boosting soundness to q1^-lambda)
     n_A = 1    # height of A matrix
     m_A = 10   # width of A matrix (must be same size as m1)
-    bound = (2*math.sqrt(deg*20)*eta*kappa)*((math.sqrt(3)+math.sqrt(2))*deg*alpha*2 + alpha*(math.sqrt(20*deg))) 
-    # print("sig_comm", cred)
     # Algorithm parameters
     is_opti = False  # proof size optimized sigma_n1 version with reduced garbage commitments
     if is_opti:
@@ -51,21 +38,18 @@ def test_abdlop_mlwe__(F_comm, u, cred):
     nu_s1 = 67108837
     # s1 max coefficient
     alpha_s1 = norm_Rql_bound(m1, nu_s1)  # s1 norm upper bound
-    std1 = gamma1 *  alpha_s1# standard deviation
+    std1 = gamma1 *  alpha_s1 # standard deviation
 
     rep_M1 = rej1_M(gamma1)  # repetition rate
 
     gamma2 = 1
     nu_s2 = 59
     alpha_s2 = norm_Rql_bound(m2, nu_s2)
-    std2 = gamma2 * eta * alpha_s2
-
+    std2 = gamma2 * alpha_s2 *eta
     rep_M2 = rej2_M(gamma2)
 
     # Private information
-    # s1 = rand_Rql_small(m1, nu_s1)  # ABDLOP Ajtai part message vector
     s2 = rand_Rql_small(m2, nu_s2)  # ABDLOP randomness vector
-    # s1 = sg.matrix(R_q, cred)
     temp_s = []
     for i in range(cred.shape[0]):
         temp_s.append(ZZl_2_Rql(cred[i][0]))
@@ -80,6 +64,7 @@ def test_abdlop_mlwe__(F_comm, u, cred):
     b_ext = rand_Rql(m2)
 
     # MLWE
+
     temp = []
 
     for i in range(F_comm.shape[1]):
@@ -98,7 +83,7 @@ def test_abdlop_mlwe__(F_comm, u, cred):
     B_is = [int(bound)]  # integer Euclidean norm bound (sqrt(2048) is upper bound of norm for nu_s1 = 1)
 
     gamma3 = 6
-    std3 = gamma3 * sg.sqrt(d + B_is[0]**2)
+    std3 = gamma3 * B_is[0]
     rep_M3 = rej_bimodal_M(gamma3)
 
     global rep_rate_abdlop_mlwe
@@ -111,13 +96,14 @@ def test_abdlop_mlwe__(F_comm, u, cred):
     theta = sg.vector(R_q, [N_2_binary_Rq(squared_norm_diffs[0])])
     tA = A1 * stack_vec_Rql([s1, theta]) + A2 * s2  # ABDLOP tA
 
+    print(time.perf_counter()- start)
     result = abdlop_mlwe(m1, m2, n, k, Z, n_is, lambd,
                        is_opti, rej_u_1, rej_u_2, rej_u_3, get_challenge_u,
                        std1, rep_M1, std2, rep_M2, std3, rep_M3, roh,
                        s1, s2, A1, A2, B_gamma, B_beta, B_ext, b_ext, theta, tA,
                        E_s_is, v_is, B_is)
 
-    iterations = 0
+    iterations = 1
     while result == "Rejected":
         iterations = iterations + 1 
         result = abdlop_mlwe(m1, m2, n, k, Z, n_is, lambd,
@@ -125,25 +111,30 @@ def test_abdlop_mlwe__(F_comm, u, cred):
                         std1, rep_M1, std2, rep_M2, std3, rep_M3, roh,
                         s1, s2, A1, A2, B_gamma, B_beta, B_ext, b_ext, theta, tA,
                         E_s_is, v_is, B_is)
+    
     if result == False:
-        return False
+        return False, iterations
     else: 
-        return True, 0
+        return True, iterations
 
 
-def verify_test(num_iterations = 10):
+def verify_test(num_iterations = 100):
     data = []
     run_times = []
+    d = 512
     N = 512
+    k = 4
     q1 = 4294966997
     q2 = 67108837
+    poly_mod = np.poly1d([1] + [0]*(N-1) + [1])
     n = 1  
     l = 1
+    l_hat = 2
     tau = 2
-    poly_mod = np.poly1d([1] + [0]*(N-1) + [1])
+    norm_m = 22
 
     for index in range(num_iterations):  
-        print("NEW ITERATION____________________________________________")
+        print("___NEW ITERATION___", index)
 
         start = time.perf_counter()   
         alph = math.ceil(2*math.sqrt(q2 +1)*((2*math.sqrt(2))*math.sqrt(N) + 1))
@@ -158,18 +149,21 @@ def verify_test(num_iterations = 10):
         message = ZZl_2_Rql(usk[0][0])    
         c2 = comm[1:]
         u = []
+        
         bound = (math.sqrt(3) + math.sqrt(2))*N*alph*2 + alph*math.sqrt(N*10)
         cred, u = AC_issue(D,A2, opk_a0,opk_B,u,comm,N,poly_mod,q2,bound)
         fcomm = generate_f_comm(opk_B,c2,D,opk_a0,A2,q2, poly_mod,N)
-        result = test_abdlop_mlwe__(fcomm, u, cred)
+        result, num_runs = test_abdlop_mlwe__(fcomm, u, cred,start,bound)
+
         if result == True:
             rt = time.perf_counter() - start
-            data.append({"Index": index, "Time":rt, "Success":True, "Error": 0, "message": message, "Credential":cred})
+            data.append({"Index": index, "Time":rt, "Success":True, "Iterations":num_runs, "Error": 0, "message": message, "Credential":cred})
             run_times.append(rt)
         else:
             rt = time.perf_counter() - start
             run_times.append(rt)
-            data.append({"Index": index, "Time":rt, "Success":False, "Error": 1, "message": message, "Credential":[]})    
+            data.append({"Index": index, "Time":rt, "Success":False, "Iterations":num_runs, "Error": 1, "message": message, "Credential":[]})
+    
     avg = np.average(np.array(run_times))
     med = np.median(np.array(run_times))
     min = np.min(np.array(run_times))
@@ -180,9 +174,93 @@ def verify_test(num_iterations = 10):
     print("TIME: (avg, med, min, max)", avg, med, min, max)
     return data, avg, med, min, max
 
+# data, avg, med, min, max = verify_test()
+# csv_file =  'VERIFY_test_5.csv'
+# field_names_disclose = ["Index", "Time", "Success", "Iterations","Error", "message", "Credential"]
+# write_file(csv_file,field_names_disclose, data)
 
-data, avg, med, min, max = verify_test()
-csv_file =  'VERIFY_test_2.csv'
-field_names_disclose = ["Index", "Time", "Success", "Error", "message", "Credential"]
+
+def verify_transferred_credential_test(num_iterations = 100):
+    data = []
+    run_times = []
+    N = 512
+    k = 4
+    q1 = 4294966997
+    q2 = 67108837
+    poly_mod = np.poly1d([1] + [0]*(N-1) + [1])
+    n = 1  
+    l = 1
+    l_hat = 2
+    tau = 2
+    norm_m = 22
+    eta = 59
+    alph = math.ceil(2*math.sqrt(q2 +1)*((2*math.sqrt(2))*math.sqrt(N) + 1))
+    n1 = 1
+
+    G = np.zeros((1,2,N))
+    G[0][0][-1] = 1
+    G[0][1][-1] = np.rint(np.sqrt(q2))
+    A, D, q1, q2, N, kappa, gamma, gamma_prime, alpha, opk_a0, opk_B, opk_u, osk,usk = AC_setup()
+    A2 = A[:1, 1:]
+    comm, rand = AC_registration(n=4,m=2,N=N,A=A,poly_mod=poly_mod,q1=q1,q2=q2,n1=1,l=l,G=G,tau=tau, usk=usk, beta=2)        
+    message = ZZl_2_Rql(usk[0][0])    
+    c2 = comm[1:]
+    u = []
+    bound = (math.sqrt(3) + math.sqrt(2))*N*alph*2 + alph*math.sqrt(N*10)
+    fcomm, cred, u = AC_issue(D,A2, opk_a0,opk_B,u,comm,N,poly_mod,q2,bound)
+    alph = math.ceil(2*math.sqrt(q2 +1)*((2*math.sqrt(2))*math.sqrt(N) + 1))
+
+    for index in range(num_iterations):  
+        print("___NEW ITERATION___", index)
+
+        start = time.perf_counter()   
+        transferred_f_comm, transferred_cred, transferred_comm, pi_prime,transferred_u = AC_prove(D,A,opk_a0, opk_B,n,k,l,l_hat,tau,usk,rand,N,poly_mod,q1,q2,n1,m,comm,cred,u,gamma_prime,G,beta=2)
+
+        bound_transferred = (2*math.sqrt(N*20)*eta*kappa)*((math.sqrt(3)+math.sqrt(2))*N*alph*2 + alph*(math.sqrt(20*N))) 
+        result, num_runs = test_abdlop_mlwe__(transferred_f_comm, transferred_u, transferred_cred,start, bound_transferred)
+
+        if result == True:
+            rt = time.perf_counter() - start
+            data.append({"Index": index, "Time":rt, "Success":True, "Iterations":num_runs, "Error": 0, "message": message, "Credential":cred})
+            run_times.append(rt)
+        else:
+            rt = time.perf_counter() - start
+            run_times.append(rt)
+            data.append({"Index": index, "Time":rt, "Success":False, "Iterations":num_runs, "Error": 1, "message": message, "Credential":[]})
+    
+    avg = np.average(np.array(run_times))
+    med = np.median(np.array(run_times))
+    min = np.min(np.array(run_times))
+    max = np.max(np.array(run_times))
+
+    print("--------------------------------------------------------------------------")
+    print("VERIFY TRANSFER TEST")
+    print("TIME: (avg, med, min, max)", avg, med, min, max)
+    return data, avg, med, min, max
+
+data, avg, med, min, max = verify_transferred_credential_test()
+csv_file =  'VERIFY_test_transferred_100.csv'
+field_names_disclose = ["Index", "Time", "Success", "Iterations","Error", "message", "Credential"]
 write_file(csv_file,field_names_disclose, data)
+# res, cred = verify_test()
+# print(res, cred)
+    
+# csv_file = 'ISSUE_results.csv'
+
+# with open(csv_file, mode='a', newline='') as file:
+#     # Define the field names for the CSV header
+#     fieldnames = ['Index', 'Time','Function', 'Status']
+#     writer = csv.DictWriter(file, fieldnames=fieldnames)
+
+#     # Write the header
+#     writer.writeheader()
+    
+#     # Write the data rows
+#     writer.writerows(data)
+
+# print(f"Data has been written to {csv_file}")
+#print("Run Toolbox Proof...")
+#print(repeat_until_accept(test_abdlop_toolbox))
+
+#print(measure_rep_rate(test_abdlop_toolbox, rep_rate_abdlop_toolbox, runs=10))
 

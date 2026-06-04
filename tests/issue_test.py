@@ -1,17 +1,16 @@
 
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from ac import *
-from latticezk import *
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src/')))
+from src.ac import *
+from latticezk_commitment import *
 import time
-from extra_functions import write_file
+from helpers import write_file
 
 def R_to_S_vec(S,vec):
     new_vec = sg.vector(S, len(vec))
     for i in range(len(vec)):
         coeffs = Rql_2_ZZl(vec)
-        # print(coeffs)
         poly_q2 = S(sum(c * t**k for k, c in enumerate(coeffs)))
         new_vec[i] = poly_q2
     return new_vec  
@@ -207,19 +206,20 @@ def issue_test(num_iterations = 10):
         A2 = A[:1, 1:]
         comm,rand = AC_registration(n=4,m=2,N=N,A=A,poly_mod=poly_mod,q1=q1,q2=q2,n1=1,l=l,G=G,tau=tau, usk=usk, beta=2)        
         miu = ZZl_2_Rql(rand.flatten())
-        message = ZZl_2_Rql(usk[0][0])      
+        message = ZZl_2_Rql(usk.flatten())      
 
         miu = stack_vec_Rql([miu, message])   
         result = run_nizk_proof(miu)
         if result == True:
             u = []
             bound = (math.sqrt(3) + math.sqrt(2))*N*alph*2 + alph*math.sqrt(N*10)
-            cred, u = AC_issue(D,A2, opk_a0,opk_B,u,comm,N,poly_mod,q2,bound)
+            fcomm, cred, u = AC_issue(D,A2, opk_a0,opk_B,u,comm,N,poly_mod,q2,bound)
             rt = time.perf_counter() - start
             data.append({"Index": index, "Time":rt, "Success":True, "Error": 0, "message": message, "Credential":cred})
             run_times.append(rt)
         else:
-            run_times.append(time.perf_counter() - start)
+            rt = time.perf_counter() - start
+            run_times.append(rt)            
             data.append({"Index": index, "Time":rt, "Success":False, "Error": 1, "message": message, "Credential":[]})
     
     avg = np.average(np.array(run_times))

@@ -8,6 +8,8 @@ import sage.all as sg
 from sage.stats.distributions.discrete_gaussian_integer import DiscreteGaussianDistributionIntegerSampler
 import math
 
+q2= 67108837
+N = 512
 
 def mod_2D(x, q):
     r = (x + np.floor(q/2)) % q - np.floor(q/2) 
@@ -19,7 +21,7 @@ def mod_3D(rows, x, q):
         x[i] = mod_2D(x[i],q)
     return x
 
-def poly_matmul(a,b, mod, poly_mod, N=2048):
+def poly_matmul(a,b, mod, poly_mod, N=512):
     matmul = []
     a = np.array(a)
     b = np.array(b)
@@ -163,7 +165,7 @@ def neg_poly_matmul_right(a, neg_b, mod, poly_mod, N=2048):
             matmul.append(element)
     matmul = np.reshape(np.array(matmul), (a_n,b_m,N))        
     return matmul
-
+# multiply a 2D matrix/vector where its elements are polynomials
 def poly_matmul_no_mod(a,b, poly_mod, N=2048):
     matmul = []
     a = np.array(a)
@@ -312,7 +314,7 @@ def bdlop_combine(a,b,mod, poly_mod, N=2048):
         sum.append(element)
     return np.array(sum)
 
-def bdlop_randomize(comm, A0, rand, n1, n2, m, q1_mod, q2_mod, poly_mod, N):
+def bdlop_randomize(comm, A0, rand, n1, q1_mod, q2_mod, poly_mod, N):
     A0 = np.array(A0)
     rand = np.array(rand)
     comm = np.array(comm)
@@ -352,8 +354,8 @@ def cts_commit(A, message, rand, G, N,poly_mod, q1,q2, n1, l=1, tau=7):
     comm = bdlop_commit(A, dott, rand, q1, q2, poly_mod, n1=n1,n2=l,m=l*tau, N=N)
     return comm
 
-def cts_randomize(comm, A, rand, n1, n2, m, q1_mod, q2_mod, poly_mod, N):
-    new_comm = bdlop_randomize(comm, A, rand, n1, n2, m, q1_mod, q2_mod, poly_mod, N)
+def cts_randomize(comm, A, rand, n1, q1_mod, q2_mod, poly_mod, N):
+    new_comm = bdlop_randomize(comm, A, rand, n1, q1_mod, q2_mod, poly_mod, N)
     return new_comm
 
 def cts_combine(rand, rand_prime):
@@ -372,21 +374,22 @@ def cts_keygen(l, l_hat, tau, D, G,N,q1,q2,beta=1):
     u = gen_matrix_ring(l,1,q2,N)
     return a0, B, u, T
 
-q2= 67108837
+# q2= 67108837
+# N = 512
 # Zq = sg.Zmod(q2)
 # R = sg.PolynomialRing(Zq, 'x')
 # x = R.gen()
 # R_q = R.quotient(x**N + 1, 'X')
 # X = R_q.gen()
 
-def find_particular_solution(A, t, q):
-    n, m = A.nrows(), A.ncols()
-    M = A.augment(sg.identity_matrix(R, n)).stack(sg.Matrix(R, ncols=n + ncols, nrows=m - n))
-    M = M.echelon_form()
-    for row in M.rows():
-        if A * row[:m] % q == t:
-            return sg.vector(ZZ, row[:m])
-    raise ValueError("No solution found") 
+# def find_particular_solution(A, t, q):
+#     n, m = A.nrows(), A.ncols()
+#     M = A.augment(sg.identity_matrix(R, n)).stack(sg.Matrix(R, ncols=n + ncols, nrows=m - n))
+#     M = M.echelon_form()
+#     for row in M.rows():
+#         if A * row[:m] % q == t:
+#             return sg.vector(ZZ, row[:m])
+#     raise ValueError("No solution found") 
 
 def rot(a,n,m,degree,poly_mod):
     new_a_ZZ= np.zeros((n*degree, m*degree))
@@ -470,7 +473,7 @@ def cts_sign(D, A0, B, comm, A2, u, N, width, height, q2, bound, poly_mod):
                 sig_comm.append(int(sampler()))
     sig_comm = np.reshape(np.array(sig_comm), (width, height, N))
     u = poly_matmul(F_comm, sig_comm, q2, poly_mod, N)
-    return sig_comm, u
+    return F_comm, sig_comm, u
 
 # def cts_sign_(G_perp,F,T,u,alpha,N,poly_mod, q2, R, w, w_prime):
 #     F_perp = get_F_perp_trapdoor(T, w, G_perp, w_prime, R,N=N)
@@ -503,22 +506,28 @@ def get_trap(T, R,N):
     full_matrix[N*5:, N*5:] = np.identity(N*4)
     return full_matrix
 
-def cts_transfer(D, A, A0, B,n, k,l, l_hat, tau, sig_comm, message, rand, rand_prime, N,poly_mod, q1,q2,n1,n2,m, u, gamma_prime,G):
+def cts_transfer(randomized_comm, D, A, A0, B,n, k,l, l_hat, tau, sig_comm, message, rand, rand_prime, N,poly_mod, q1,q2):
     split_sig = np.split(sig_comm, [(1+tau)*l+l_hat,((1+tau)*l+l_hat) + l*tau])
     s1 = split_sig[0] 
     s2 = split_sig[1]
     s3 = split_sig[2]
-    new_comm = cts_commit(A,message,rand,G,N, poly_mod, q1,q2, n1,l,tau=tau) #check params(A, message, rand,N,poly_mod, q1,q2, n1, l=1)
-    randomized_comm = cts_randomize(new_comm,A,rand_prime,n1,n2, m, q1,q2,poly_mod,N)
     split_comm = np.split(randomized_comm, [n])
+    c1 = split_comm[0]
     c2 = split_comm[1]
     rand_tilde = cts_combine(rand,rand_prime)
     split_rand = np.split(rand_tilde,[n])
+    
     last_row_temp = poly_matmul_no_mod(split_rand[1],s2,poly_mod,N)
     last_row = poly_add_3D_no_mod(s3,(-1)*last_row_temp,poly_mod,N)
-    new_sig_comm = np.concatenate((s1, s2, last_row), axis=0)
-    f_comm_prime = generate_f_comm(B,c2,D,A0,A[1:,l:],q2, poly_mod,N)
-    return nizk_prove(f_comm_prime, u, new_sig_comm, gamma_prime, q2, poly_mod, N)
+
+    sig_comm = np.concatenate((s1, s2, last_row), axis=0)
+
+    A2 = A[:1, 1:]
+
+    f_comm = generate_f_comm(B,c2,D,A0,A2,q2, poly_mod,N)
+    u = poly_matmul(f_comm, sig_comm, q2, poly_mod, N)
+
+    return f_comm, sig_comm, u
 
 def cts_verify(u,A0,A, B,D,n,l, comm, sig, sig_type, q2, poly_mod,N):
     split_comm = np.split(comm, [n])
@@ -536,8 +545,8 @@ def cts_verify(u,A0,A, B,D,n,l, comm, sig, sig_type, q2, poly_mod,N):
             return False
     return False
 
-def AC_setup():
-    A,D, q1, q2, N, kappa, gamma, gamma_prime, alpha  = cts_setup()
+def AC_setup(N=512):
+    A,D, q1, q2, N, kappa, gamma, gamma_prime, alpha  = cts_setup(N=N)
     # params = nizk_setup()
     l = 1
     l_hat = 2
@@ -554,7 +563,6 @@ def AC_setup():
     beta = 2 
     #user setup
     d = 128
-    N = 512
     usk = np.zeros((1,1,N))
     indices = np.random.choice(N, w, replace=False)
     for i in indices:
@@ -569,18 +577,17 @@ def AC_registration(n,m,N,A,poly_mod,q1,q2,n1,l,usk, G,tau,beta=2):
     return comm,rand
 
 def AC_issue(D,A2, A0,B,u,comm,N,poly_mod,q2,bound):
-    sigma, u = cts_sign(D,A0,B,comm, A2,u,N,10,1,q2,bound,poly_mod)
-    return sigma, u
+    F_comm, sigma, u = cts_sign(D,A0,B,comm, A2,u,N,10,1,q2,bound,poly_mod)
+    return F_comm, sigma, u
 
 def AC_prove(D,A,A0,B,n,k,l,l_hat,tau,message,rand,rand_prime,N,poly_mod,q1,q2,n1,n2,m,comm,credential,u,gamma_prime,G,beta=2):
-    rand_prime = generate_random(n,m,N,beta)
-    randomized_comm = cts_randomize(comm, A, rand_prime, n1, n2, m, q1, q2, poly_mod, N)
-    transferred_sig = cts_transfer(D, A, A0, B,n, k,l, l_hat, tau, credential, message, rand, rand_prime, N,poly_mod, q1,q2,n1,n2,m, u, gamma_prime,G)
+    rand_prime = generate_random(4,2,N,beta)
+    randomized_comm = cts_randomize(comm, A, rand_prime, n1, q1, q2, poly_mod, N)
+    transferred_f_comm, transferred_sig, u = cts_transfer(randomized_comm, D, A, A0, B,n, k,l, l_hat, tau, credential, message, rand, rand_prime, N,poly_mod, q1,q2)
   
     #TODO: nizk for well_formedness of comm_prime
     pi_prime = 0
-    return transferred_sig, (randomized_comm,pi_prime)
-
+    return  transferred_f_comm, transferred_sig, randomized_comm, pi_prime, u
 def AC_verify(u,A0,A,B,D,n,l, comm, sig, sig_type, q2, poly_mod,N, alpha):
     result = cts_verify(u,A0,A,B,D,n,l, comm, sig, sig_type, q2, poly_mod,N)
     split_comm = np.split(comm, [n])
@@ -772,7 +779,7 @@ def fig_6_prove_step_1(s1, s2, sigma1, sigma2, poly_mod, nu=23, k=4, l = 0, sigm
     
     yR2 = poly_matmul(ring_transpose(y),R2, q,poly_mod, d)
     
-    yR2y = poly_matmul(yR2, y, q,poly_mod, d) 
+    yR2y = poly_matmul(yR2, y, q,poly_mod, d)
 
     by2 = poly_matmul(ring_transpose(b_vec),y2,q,poly_mod,d)
     v = np.fmod(yR2y+ by2 ,q)
